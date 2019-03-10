@@ -79,6 +79,8 @@ public class Main {
                 });
 
 
+        System.out.printlm();
+
         try {
             CSVUtil.writeObject(logEntries,outputFile,",");
         } catch (IOException e) {
