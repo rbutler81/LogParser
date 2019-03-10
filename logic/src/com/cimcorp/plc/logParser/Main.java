@@ -79,7 +79,7 @@ public class Main {
                 });
 
 
-        System.out.printlm();
+        System.out.println();
 
         try {
             CSVUtil.writeObject(logEntries,outputFile,",");
