@@ -4,7 +4,9 @@ import com.custom.ArgNotFoundException;
 import com.custom.FileNotFoundException;
 import csvUtils.CSVUtil;
 
+import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.lang.reflect.Array;
 import java.lang.reflect.InvocationTargetException;
@@ -12,15 +14,20 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
+import java.util.TimeZone;
 import java.util.stream.Collectors;
 
 public class Main {
 
     public static final String PATH = Paths.get(".").toAbsolutePath().normalize().toString() + "\\";
     public static final String CONFIG_FILE = PATH + "config.ini";
+    public static final int REF_START_DAY = 11;
+    public static final int REF_END_DAY = 12;
+    public static final int REF_MONTH = 3;
 
     public static void main(String[] args) throws FileNotFoundException, ArgNotFoundException {
 
+        // Check for files needed
         if (Array.getLength(args) == 0){
             throw new ArgNotFoundException("LogFileToParse");
         }
@@ -40,6 +47,7 @@ public class Main {
 
         final String outputFile = PATH + "output.csv";
 
+        // Read the log csv file from the PLC
         List<String[]> csvLines = null;
         try {
             csvLines = CSVUtil.read(logFileStr,",");
@@ -47,6 +55,20 @@ public class Main {
             e.printStackTrace();
         }
 
+        //Calendar reference time - set to when this log start
+        Calendar refTimeStart = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
+        refTimeStart.clear();
+        refTimeStart.setLenient(false);
+        refTimeStart.set(2019,REF_MONTH, REF_START_DAY);
+
+        Calendar refTimeEnd = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
+        refTimeEnd.clear();
+        refTimeEnd.setLenient(false);
+        refTimeEnd.set(2019,REF_MONTH, REF_END_DAY);
+
+        long test = refTimeEnd.getTimeInMillis() - refTimeStart.getTimeInMillis();
+
+        // Make a list of the log entries found in the csv file. Separate from 'bad lines'.
         final String[] header = csvLines.get(0);
         csvLines.remove(0);
 
@@ -62,13 +84,14 @@ public class Main {
         }
         csvLines = null;
 
-        logEntries = logEntries.stream()
+        //Filter any event that counts crates at certain point in the system - make a separate list - write it to a csv file
+        List<LogRow> crateCountEntries = logEntries.stream()
                 .filter(p->p.getHeader().contains("MET"))
-                .filter(p->p.getDateTime().get(Calendar.DAY_OF_MONTH)==9)
+                .filter(p->p.getDateTime().get(Calendar.DAY_OF_MONTH) == REF_START_DAY)
                 .collect(Collectors.toList());
 
         List<String> descriptions = new ArrayList<>();
-        logEntries.stream()
+        crateCountEntries.stream()
                 .peek(p -> {
                     if (!descriptions.contains(p.getDescription())) {
                         descriptions.add(p.getDescription());
@@ -78,11 +101,8 @@ public class Main {
                     p.setColumnLabel(descriptions);
                 });
 
-
-        System.out.println();
-
         try {
-            CSVUtil.writeObject(logEntries,outputFile,",");
+            CSVUtil.writeObject(crateCountEntries,outputFile,",");
         } catch (IOException e) {
             e.printStackTrace();
         } catch (NoSuchMethodException e) {
@@ -95,8 +115,41 @@ public class Main {
             e.printStackTrace();
         }
 
+        //Find all the ON/OFF items - make a list and time how long each one was on and off
+        OnOffEntries ofe = new OnOffEntries(refTimeStart, refTimeEnd);
 
-        System.out.println();
+        List<LogRow> rtsEntries = logEntries.stream()
+                .filter(p->p.getDateTime().get(Calendar.DAY_OF_MONTH) == REF_START_DAY)
+                .collect(Collectors.toList());
+
+        OnOffEntries.checkAndAddEvent(ofe,rtsEntries.stream().filter(p->!p.getDescription().contains("ReadyToSend")).collect(Collectors.toList()),refTimeStart, refTimeEnd);
+
+        List<LogRow> rts = rtsEntries.stream()
+                .filter(p->!p.getDescription().contains("ReadyToSend"))
+                .peek(x-> {
+                    x.setDescription("ReadyToSend");
+                })
+                .collect(Collectors.toList());
+
+        OnOffEntries.checkAndAddEvent(ofe,rts,refTimeStart,refTimeEnd);
+
+        BufferedWriter writer = null;
+
+        for (OnOffEntry o : ofe.getEntries()) {
+
+            try {
+                writer = new BufferedWriter(new FileWriter(PATH + "OnOffTimes.txt", true));
+                writer.write(o.toString() + "\n\n");
+
+            } catch (IOException e) {
+            } finally {
+                try {
+                    if (writer != null)
+                        writer.close();
+                } catch (IOException e) {
+                }
+            }
+        }
 
     }
 
