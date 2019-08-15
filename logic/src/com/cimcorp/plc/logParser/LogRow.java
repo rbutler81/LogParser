@@ -17,7 +17,7 @@ public class LogRow implements CSVWriter {
     private long colour;
     private String header;
     private String description;
-    private int crates;
+
     private List<String> columnLabel;
 
     public LogRow(){}
@@ -29,23 +29,7 @@ public class LogRow implements CSVWriter {
         this.colour = Integer.parseInt(str[3]);
         this.header = str[4];
         this.description = str[5];
-        if (Array.getLength(str) > 6) {
-            for (int i=6; i < Array.getLength(str); i++){
-                if (str[i].indexOf("Crates") != -1){
-                    int k = str[i].indexOf("Crates");
-                    int j = str[i].indexOf(" ",k);
-                    crates = Integer.parseInt(str[i].substring(j+1));
-                }
-                else {
-                    try {
-                        crates = Integer.parseInt(str[i]);
-                    } catch (NumberFormatException e) {
 
-                    }
-                }
-
-            }
-        }
     }
 
     public List<String> getColumnLabel() {
@@ -117,15 +101,6 @@ public class LogRow implements CSVWriter {
 
     public LogRow setDescription(String description) {
         this.description = description;
-        return this;
-    }
-
-    public int getCrates() {
-        return crates;
-    }
-
-    public LogRow setCrates(int crates) {
-        this.crates = crates;
         return this;
     }
 
@@ -201,8 +176,6 @@ public class LogRow implements CSVWriter {
         for (int i = 3; i < Array.getLength(header); i++){
             header[i] = lr.get(0).getColumnLabel().get(i-3);
         }
-
-        System.out.println();
 
         ls.add(header);
         for (LogRow p : lr) {

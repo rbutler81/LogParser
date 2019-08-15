@@ -3,6 +3,7 @@ package com.cimcorp.plc.logParser;
 import com.custom.ArgNotFoundException;
 import com.custom.FileNotFoundException;
 import csvUtils.CSVUtil;
+import configFileReader.ConfigFileReader;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -11,19 +12,16 @@ import java.io.IOException;
 import java.lang.reflect.Array;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.List;
-import java.util.TimeZone;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public class Main {
 
     public static final String PATH = Paths.get(".").toAbsolutePath().normalize().toString() + "\\";
     public static final String CONFIG_FILE = PATH + "config.ini";
-    public static final int REF_START_DAY = 11;
-    public static final int REF_END_DAY = 12;
-    public static final int REF_MONTH = 3;
+    public static final int REF_START_DAY = 13;
+    public static final int REF_END_DAY = 14;
+    public static final int REF_MONTH = 8;
 
     public static void main(String[] args) throws FileNotFoundException, ArgNotFoundException {
 
@@ -40,6 +38,9 @@ public class Main {
         if (!configFile.exists()){
             throw new FileNotFoundException(configFile);
         }
+
+        // read the config file, gather parameters
+        Map<String,List<String>> configParams = ConfigFileReader.fromFile(CONFIG_FILE);
 
         if (!logFile.exists()){
             throw new FileNotFoundException(logFile);
@@ -65,8 +66,6 @@ public class Main {
         refTimeEnd.clear();
         refTimeEnd.setLenient(false);
         refTimeEnd.set(2019,REF_MONTH, REF_END_DAY);
-
-        long test = refTimeEnd.getTimeInMillis() - refTimeStart.getTimeInMillis();
 
         // Make a list of the log entries found in the csv file. Separate from 'bad lines'.
         final String[] header = csvLines.get(0);

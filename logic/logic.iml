@@ -9,5 +9,6 @@
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="module" module-name="CSVUtils" exported="" />
     <orderEntry type="module" module-name="CustomExceptions" exported="" />
+    <orderEntry type="module" module-name="ConfigFileReader" exported="" />
   </component>
 </module>
