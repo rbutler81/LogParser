@@ -3,52 +3,75 @@ package com.cimcorp.plc.logParser;
 import com.custom.ArgNotFoundException;
 import com.custom.FileNotFoundException;
 import csvUtils.CSVUtil;
-import configFileReader.ConfigFileReader;
+import configFileUtil.Config;
 
-import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.lang.reflect.Array;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.function.BiPredicate;
 import java.util.stream.Collectors;
 
 public class Main {
 
-    public static final String PATH = Paths.get(".").toAbsolutePath().normalize().toString() + "\\";
-    public static final String CONFIG_FILE = PATH + "config.ini";
-    public static final int REF_START_DAY = 13;
-    public static final int REF_END_DAY = 14;
-    public static final int REF_MONTH = 8;
+    // read the config file, gather parameters
+    static final String PATH = Paths.get(".").toAbsolutePath().normalize().toString() + "\\";
+    static final String CONFIG_FILE = PATH + "config.ini";
+
+    static final Config CONFIG_PARAMS = Config.readIniFile(CONFIG_FILE);
+    static final int START_MONTH = CONFIG_PARAMS.getSingleParamAsInt("Month");
+    static final int START_DAY = CONFIG_PARAMS.getSingleParamAsInt("StartDay");
+    static final int END_DAY = CONFIG_PARAMS.getSingleParamAsInt("EndDay");
+    static final int YEAR = CONFIG_PARAMS.getSingleParamAsInt("Year");
+    static final int END_MONTH = decideEndMonth(START_DAY, END_DAY, START_MONTH);
+    static final List<String> HEADERS_TO_FILTER = CONFIG_PARAMS.getParam("HeadersToFilter");
+    static final List<String> PLACES_TO_FILTER = CONFIG_PARAMS.getParam("Places");
+    static final List<String> COLUMNS_W_VALUES_OTHER_THAN_ONE = CONFIG_PARAMS.getParam("ColumnWithValueOtherThanOne");
+    static final List<String> DO_NOT_INCLUDE = CONFIG_PARAMS.getParam("DoNotIncludeAsColumnHeader");
+
+    // static methods /////////////////////////////////////////////////////////////////////////
+    static int decideEndMonth(int startDay, int endDay, int startMonth) {
+        if (endDay < startDay) {
+            return startMonth + 1;
+        } else {
+            return startMonth;
+        }
+    }
+
+    // setup static variables ///////////////////////////////////////////////////////////////////
+    static final String OUTPUT_FILE = PATH + "output.csv";
+
+    static BiPredicate<LogRow,List<String>> headerIsInList = (r, ls) -> {
+        return ls.contains(r.getHeader());
+    };
+
+    static BiPredicate<LogRow,List<String>> placeSubstringExistsInString = (r, ls) -> {
+        boolean ret = false;
+        for (String s : ls) {
+            ret = r.getDescription().indexOf(s) >= 0;
+            if (ret) {break;};
+        }
+        return ret;
+    };
 
     public static void main(String[] args) throws FileNotFoundException, ArgNotFoundException {
 
-        // Check for files needed
+        // Check for files needed ///////////////////////////////////////////////////////////////
         if (Array.getLength(args) == 0){
             throw new ArgNotFoundException("LogFileToParse");
         }
 
         final String logFileStr = PATH + args[0];
 
-        File configFile = new File(CONFIG_FILE);
         File logFile = new File(logFileStr);
-
-        if (!configFile.exists()){
-            throw new FileNotFoundException(configFile);
-        }
-
-        // read the config file, gather parameters
-        Map<String,List<String>> configParams = ConfigFileReader.fromFile(CONFIG_FILE);
 
         if (!logFile.exists()){
             throw new FileNotFoundException(logFile);
         }
 
-        final String outputFile = PATH + "output.csv";
-
-        // Read the log csv file from the PLC
+        // Read the log csv file from the PLC //////////////////////////////////////////////////
         List<String[]> csvLines = null;
         try {
             csvLines = CSVUtil.read(logFileStr,",");
@@ -56,41 +79,47 @@ public class Main {
             e.printStackTrace();
         }
 
-        //Calendar reference time - set to when this log start
+        //Calendar reference time - set to when this log start /////////////////////////////////
         Calendar refTimeStart = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
         refTimeStart.clear();
         refTimeStart.setLenient(false);
-        refTimeStart.set(2019,REF_MONTH, REF_START_DAY);
+        refTimeStart.set(YEAR, START_MONTH, START_DAY);
 
         Calendar refTimeEnd = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
         refTimeEnd.clear();
         refTimeEnd.setLenient(false);
-        refTimeEnd.set(2019,REF_MONTH, REF_END_DAY);
+        refTimeEnd.set(YEAR, END_MONTH, END_DAY);
 
-        // Make a list of the log entries found in the csv file. Separate from 'bad lines'.
+        // Make a list of the log entries found in the csv file. Separate from 'bad lines'. ////
         final String[] header = csvLines.get(0);
         csvLines.remove(0);
 
+        // Scan through the list of strings (csv file) and create a LogRow for each one ////////
         List<LogRow> logEntries = new ArrayList<>();
         List<String[]> badLines = new ArrayList<>();
         for (String[] s : csvLines) {
             if (Array.getLength(s) >= 6) {
                 logEntries.add(new LogRow(s));
-            }
-            else{
+            } else {
                 badLines.add(s);
             }
         }
         csvLines = null;
 
-        //Filter any event that counts crates at certain point in the system - make a separate list - write it to a csv file
-        List<LogRow> crateCountEntries = logEntries.stream()
-                .filter(p->p.getHeader().contains("MET"))
-                .filter(p->p.getDateTime().get(Calendar.DAY_OF_MONTH) == REF_START_DAY)
+        //Filter any event that counts crates at certain point in the system - make a separate list
+        List<LogRow> filteredLogRows = logEntries.stream()
+                .filter(p-> headerIsInList.test(p,HEADERS_TO_FILTER))
+                .filter(p-> placeSubstringExistsInString.test(p,PLACES_TO_FILTER))
+                .filter(p->p.getDateTime().get(Calendar.DAY_OF_MONTH) == START_DAY)
                 .collect(Collectors.toList());
 
-        List<String> descriptions = new ArrayList<>();
-        crateCountEntries.stream()
+        List<PivotRow> pr = new ArrayList<>();
+        for (LogRow lr : filteredLogRows) {
+            pr.add(new PivotRow(lr, DO_NOT_INCLUDE, COLUMNS_W_VALUES_OTHER_THAN_ONE));
+        }
+
+        /*List<String> descriptions = new ArrayList<>();
+        filteredLogRows.stream()
                 .peek(p -> {
                     if (!descriptions.contains(p.getDescription())) {
                         descriptions.add(p.getDescription());
@@ -98,10 +127,12 @@ public class Main {
                 })
                 .forEach(p -> {
                     p.setColumnLabel(descriptions);
-                });
+                });*/
+
+        System.out.println();
 
         try {
-            CSVUtil.writeObject(crateCountEntries,outputFile,",");
+            CSVUtil.writeObject(pr, OUTPUT_FILE,",");
         } catch (IOException e) {
             e.printStackTrace();
         } catch (NoSuchMethodException e) {
@@ -115,10 +146,10 @@ public class Main {
         }
 
         //Find all the ON/OFF items - make a list and time how long each one was on and off
-        OnOffEntries ofe = new OnOffEntries(refTimeStart, refTimeEnd);
+        /*OnOffEntries ofe = new OnOffEntries(refTimeStart, refTimeEnd);
 
         List<LogRow> rtsEntries = logEntries.stream()
-                .filter(p->p.getDateTime().get(Calendar.DAY_OF_MONTH) == REF_START_DAY)
+                .filter(p->p.getDateTime().get(Calendar.DAY_OF_MONTH) == START_DAY)
                 .collect(Collectors.toList());
 
         OnOffEntries.checkAndAddEvent(ofe,rtsEntries.stream().filter(p->!p.getDescription().contains("ReadyToSend")).collect(Collectors.toList()),refTimeStart, refTimeEnd);
@@ -130,9 +161,9 @@ public class Main {
                 })
                 .collect(Collectors.toList());
 
-        OnOffEntries.checkAndAddEvent(ofe,rts,refTimeStart,refTimeEnd);
+        OnOffEntries.checkAndAddEvent(ofe,rts,refTimeStart,refTimeEnd);*/
 
-        BufferedWriter writer = null;
+        /*BufferedWriter writer = null;
 
         for (OnOffEntry o : ofe.getEntries()) {
 
@@ -148,9 +179,10 @@ public class Main {
                 } catch (IOException e) {
                 }
             }
-        }
+        }*/
 
     }
-
 }
+
+
 

@@ -47,7 +47,7 @@ public class OnOffEntries {
         ofe.setRefTimeStart(refTimeStart);
         ofe.setRefTimeEnd(refTimeEnd);
 
-        for (LogRow lr : llr) {
+        /*for (LogRow lr : llr) {
             if (lr.getHeader().equals("ON") || lr.getHeader().equals("OFF")) {
 
                 long count = ofe.getEntries().stream()
@@ -67,7 +67,7 @@ public class OnOffEntries {
                     ofe.getEntries().get(index).addEntry(new OnOffTime(lr.getHeader(),lr.getDateTime()));
                 }
             }
-        }
+        }*/
 
         for (OnOffEntry e : ofe.getEntries()) {
             e.finalizeTime(refTimeEnd);

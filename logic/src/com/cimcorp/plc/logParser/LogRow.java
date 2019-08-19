@@ -1,14 +1,9 @@
 package com.cimcorp.plc.logParser;
 
-import csvUtils.CSVWriter;
-
-import java.lang.reflect.Array;
-import java.util.ArrayList;
 import java.util.Calendar;
-import java.util.List;
 import java.util.TimeZone;
 
-public class LogRow implements CSVWriter {
+public class LogRow {
 
     private Calendar dateTime;
     private double excelDateTime;
@@ -18,27 +13,15 @@ public class LogRow implements CSVWriter {
     private String header;
     private String description;
 
-    private List<String> columnLabel;
-
     public LogRow(){}
 
     public LogRow(String[] str){
-        parseDateTime(str[0]);
+        parseExcelDateTime(str[0]);
         this.id = Integer.parseInt(str[1]);
         this.level = Integer.parseInt(str[2]);
         this.colour = Integer.parseInt(str[3]);
         this.header = str[4];
         this.description = str[5];
-
-    }
-
-    public List<String> getColumnLabel() {
-        return columnLabel;
-    }
-
-    public LogRow setColumnLabel(List<String> columnLabel) {
-        this.columnLabel = columnLabel;
-        return this;
     }
 
     public Calendar getDateTime() {
@@ -99,12 +82,7 @@ public class LogRow implements CSVWriter {
         return description;
     }
 
-    public LogRow setDescription(String description) {
-        this.description = description;
-        return this;
-    }
-
-    private void parseDateTime(String s) {
+    private void parseExcelDateTime(String s) {
         Calendar c = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
         c.clear();
         c.setLenient(false);
@@ -143,7 +121,7 @@ public class LogRow implements CSVWriter {
         this.setExcelDateTime(excelTime);
     }
 
-    private String[] buildCsvLine(LogRow lr, String[] header) {
+    /*private String[] buildCsvLine(LogRow lr, String[] header) {
 
         String[] s = new String[Array.getLength(header)];
 
@@ -153,7 +131,7 @@ public class LogRow implements CSVWriter {
 
         for (int i = 3; i < Array.getLength(header); i++){
             if (lr.getColumnLabel().get(i-3).equals(lr.getDescription())) {
-                s[i] = Integer.toString(lr.getCrates());
+                // s[i] = Integer.toString(lr.getCrates());
             }
             else {
                 s[i] = "0";
@@ -161,9 +139,9 @@ public class LogRow implements CSVWriter {
         }
 
         return s;
-    }
+    }*/
 
-    @Override
+    /*@Override
     public List<String[]> toCSV(List<?> l) {
 
         List<LogRow> lr = (List<LogRow>) l;
@@ -183,7 +161,7 @@ public class LogRow implements CSVWriter {
         }
 
         return ls;
-    }
+    }*/
 
 
 }

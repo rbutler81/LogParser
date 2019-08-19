@@ -15,7 +15,7 @@ public class OnOffEntry {
     public OnOffEntry() {
     }
 
-    public OnOffEntry(LogRow lr, Calendar refTime) {
+    /*public OnOffEntry(LogRow lr, Calendar refTime) {
         if (lr.getHeader().equals("ON") || lr.getHeader().equals("OFF")) {
             this.event = lr.getDescription();
             detail.add(new OnOffTime(lr.getHeader(), lr.getDateTime()));
@@ -29,7 +29,7 @@ public class OnOffEntry {
                 offTime = 0;
             }
         }
-    }
+    }*/
 
     public LoggedTime getOnTime() {
         return new LoggedTime(onTime);
