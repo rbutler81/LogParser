@@ -4,6 +4,7 @@ import csvUtils.CSVWriter;
 
 import java.lang.reflect.Array;
 import java.util.*;
+import java.util.function.BiPredicate;
 import java.util.stream.Collectors;
 
 public class PivotRow implements CSVWriter {
@@ -11,6 +12,7 @@ public class PivotRow implements CSVWriter {
     private static List<String> headers = new ArrayList<>();
 
     private Map<String,String> myColumnValues = new HashMap<>();
+    private Map<String,PivotRowDataPoint> myKeyValues = new HashMap<>();
 
     public static List<String> getHeaders() {
         return headers;
@@ -23,6 +25,7 @@ public class PivotRow implements CSVWriter {
     public Map<String, String> getMyColumnValues() {
         return myColumnValues;
     }
+
 
     public PivotRow setMyColumnValues(Map<String, String> myColumnValues) {
         this.myColumnValues = myColumnValues;
@@ -37,7 +40,7 @@ public class PivotRow implements CSVWriter {
         }
     }
 
-    public PivotRow(LogRow lr, List<String> exclusions, List<String> columnWithValue) {
+    public PivotRow(LogRow lr, List<String> keysToKeep) {
         if (getHeaders().size() == 0) {
             getHeaders().add("Time");
             getHeaders().add("Hour");
@@ -48,34 +51,20 @@ public class PivotRow implements CSVWriter {
         myColumnValues.put("Hour", Integer.toString(lr.getDateTime().get(Calendar.HOUR_OF_DAY)));
         myColumnValues.put("Minute", Integer.toString(lr.getDateTime().get(Calendar.MINUTE)));
 
-        List<String> columns = Arrays.asList(lr.getDescription().split(" "));
-        for (String s : columns) {
+        List<String> possibleColumns = Arrays.asList(lr.getDescription().split(" "));
 
-            String p;
-            boolean wasSplit = false;
-            if (s.contains(":")) {
-                p = s.split(":")[0];
-                wasSplit = true;
-            } else {
-                p = s;
-            }
-
-            if (!columnWithValue.contains(p) && wasSplit) {
-                p = s;
-            }
-
-            if (!getHeaders().contains(p)) {
-                getHeaders().add(p);
-            }
-
-            if (!exclusions.contains(p)) {
-                if (!columnWithValue.contains(p)) {
-                    myColumnValues.put(p, "1");
-                } else {
-                    String[] keyVal = s.split(":");
-                    myColumnValues.put(keyVal[0], keyVal[1]);
+        for (String s : possibleColumns) {
+            for (String t : keysToKeep) {
+                if (s.indexOf(t) >= 0) {
+                    PivotRowDataPoint dp = new PivotRowDataPoint(s);
+                    myKeyValues.put(dp.getKey(),dp);
+                    myColumnValues.put(dp.getColumnHeader(),dp.getValue());
+                    if (!getHeaders().contains(dp.getColumnHeader())) {
+                        getHeaders().add(dp.getColumnHeader());
+                    }
                 }
             }
+
         }
     }
 
@@ -104,10 +93,14 @@ public class PivotRow implements CSVWriter {
         ret.add(headerRow);
 
         numberOfColumns = headerRow.length;
+        int pivotRowSize = pr.size();
+        int x = 0;
         for (PivotRow p : pr) {
 
+            x = x + 1;
             String[] newRow = new String[numberOfColumns];
             for (int i = 0; i < numberOfColumns; i++) {
+                System.out.println("Writing pivot table... " + x + " of " + pivotRowSize);
                 if (p.getMyColumnValues().containsKey(headerRow[i])) {
                     newRow[i] = p.getMyColumnValues().get(headerRow[i]);
                 } else {

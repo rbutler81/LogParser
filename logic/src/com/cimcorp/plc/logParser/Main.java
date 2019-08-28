@@ -16,20 +16,7 @@ import java.util.stream.Collectors;
 
 public class Main {
 
-    // read the config file, gather parameters
-    static final String PATH = Paths.get(".").toAbsolutePath().normalize().toString() + "\\";
-    static final String CONFIG_FILE = PATH + "config.ini";
 
-    static final Config CONFIG_PARAMS = Config.readIniFile(CONFIG_FILE);
-    static final int START_MONTH = CONFIG_PARAMS.getSingleParamAsInt("Month");
-    static final int START_DAY = CONFIG_PARAMS.getSingleParamAsInt("StartDay");
-    static final int END_DAY = CONFIG_PARAMS.getSingleParamAsInt("EndDay");
-    static final int YEAR = CONFIG_PARAMS.getSingleParamAsInt("Year");
-    static final int END_MONTH = decideEndMonth(START_DAY, END_DAY, START_MONTH);
-    static final List<String> HEADERS_TO_FILTER = CONFIG_PARAMS.getParam("HeadersToFilter");
-    static final List<String> PLACES_TO_FILTER = CONFIG_PARAMS.getParam("Places");
-    static final List<String> COLUMNS_W_VALUES_OTHER_THAN_ONE = CONFIG_PARAMS.getParam("ColumnWithValueOtherThanOne");
-    static final List<String> DO_NOT_INCLUDE = CONFIG_PARAMS.getParam("DoNotIncludeAsColumnHeader");
 
     // static methods /////////////////////////////////////////////////////////////////////////
     static int decideEndMonth(int startDay, int endDay, int startMonth) {
@@ -41,13 +28,14 @@ public class Main {
     }
 
     // setup static variables ///////////////////////////////////////////////////////////////////
-    static final String OUTPUT_FILE = PATH + "output.csv";
+    static final String PATH = Paths.get(".").toAbsolutePath().normalize().toString() + "\\";
+
 
     static BiPredicate<LogRow,List<String>> headerIsInList = (r, ls) -> {
         return ls.contains(r.getHeader());
     };
 
-    static BiPredicate<LogRow,List<String>> placeSubstringExistsInString = (r, ls) -> {
+    static BiPredicate<LogRow,List<String>> substringExistsInString = (r, ls) -> {
         boolean ret = false;
         for (String s : ls) {
             ret = r.getDescription().indexOf(s) >= 0;
@@ -58,23 +46,64 @@ public class Main {
 
     public static void main(String[] args) throws FileNotFoundException, ArgNotFoundException {
 
-        // Check for files needed ///////////////////////////////////////////////////////////////
+        // Check for INI file ///////////////////////////////////////////////////////////////
+        if (Array.getLength(args) < 3){
+            throw new ArgNotFoundException("<Log File> <Config File> <Output File>");
+        }
+
+        final String CONFIG_FILE = PATH + args[1];
+
+        File iniFile = new File(CONFIG_FILE);
+
+        if (!iniFile.exists()){
+            throw new FileNotFoundException(iniFile);
+        }
+
+        // read the config file, gather parameters
+        final Config CONFIG_PARAMS = Config.readIniFile(CONFIG_FILE);
+        final int START_MONTH = CONFIG_PARAMS.getSingleParamAsInt("Month");
+        final int START_DAY = CONFIG_PARAMS.getSingleParamAsInt("StartDay");
+        final int END_DAY = CONFIG_PARAMS.getSingleParamAsInt("EndDay");
+        final int YEAR = CONFIG_PARAMS.getSingleParamAsInt("Year");
+        final int END_MONTH = decideEndMonth(START_DAY, END_DAY, START_MONTH);
+        final List<String> HEADERS_TO_FILTER = CONFIG_PARAMS.getParam("HeadersToFilter");
+        final List<String> KEYS_TO_KEEP = CONFIG_PARAMS.getParam("KeysToKeep");
+
+        // Check for log file ///////////////////////////////////////////////////////////////
         if (Array.getLength(args) == 0){
             throw new ArgNotFoundException("LogFileToParse");
         }
 
-        final String logFileStr = PATH + args[0];
+        final String LOG_FILE = PATH + args[0];
 
-        File logFile = new File(logFileStr);
+        File logFile = new File(LOG_FILE);
 
         if (!logFile.exists()){
             throw new FileNotFoundException(logFile);
         }
 
+        // setup output file
+        final String OUTPUT_FILE = PATH + args[2];
+        File outputFile = new File(OUTPUT_FILE);
+        if (outputFile.exists()) {
+            outputFile.delete();
+        }
+        outputFile = null;
+
+        // Print to console
+        System.out.println();
+        System.out.println("Log File to Read: " + LOG_FILE);
+        System.out.println("Config File to Use: " + CONFIG_FILE);
+        System.out.println("Output File to Write: " + OUTPUT_FILE);
+        System.out.println();
+
         // Read the log csv file from the PLC //////////////////////////////////////////////////
+        System.out.println("Reading " + LOG_FILE);
+        System.out.println();
+
         List<String[]> csvLines = null;
         try {
-            csvLines = CSVUtil.read(logFileStr,",");
+            csvLines = CSVUtil.read(LOG_FILE,",");
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -107,27 +136,23 @@ public class Main {
         csvLines = null;
 
         //Filter any event that counts crates at certain point in the system - make a separate list
+        System.out.println("Filtering Log Entries... ");
+        System.out.println();
+
         List<LogRow> filteredLogRows = logEntries.stream()
                 .filter(p-> headerIsInList.test(p,HEADERS_TO_FILTER))
-                .filter(p-> placeSubstringExistsInString.test(p,PLACES_TO_FILTER))
+                .filter(p-> substringExistsInString.test(p,KEYS_TO_KEEP))
                 .filter(p->p.getDateTime().get(Calendar.DAY_OF_MONTH) == START_DAY)
                 .collect(Collectors.toList());
 
         List<PivotRow> pr = new ArrayList<>();
+        int filteredRowSize = filteredLogRows.size();
+        int i = 0;
         for (LogRow lr : filteredLogRows) {
-            pr.add(new PivotRow(lr, DO_NOT_INCLUDE, COLUMNS_W_VALUES_OTHER_THAN_ONE));
+            pr.add(new PivotRow(lr, KEYS_TO_KEEP));
+            i = i + 1;
+            System.out.println("Generating pivot table... " + i + " of " + filteredRowSize);
         }
-
-        /*List<String> descriptions = new ArrayList<>();
-        filteredLogRows.stream()
-                .peek(p -> {
-                    if (!descriptions.contains(p.getDescription())) {
-                        descriptions.add(p.getDescription());
-                    }
-                })
-                .forEach(p -> {
-                    p.setColumnLabel(descriptions);
-                });*/
 
         System.out.println();
 
