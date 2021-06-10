@@ -13,7 +13,10 @@ public class PivotRowDataPoint {
        if (s.indexOf(':') >= 0) {
            String[] sArray = s.split(":");
            this.key = sArray[0];
+           this.key = this.key.replace("{","");
+           this.key = this.key.replace("}","");
            this.value = sArray[1];
+           this.value = this.value.replace("}","");
            try {
                Integer.parseInt(value);
                this.columnHeader = this.key;

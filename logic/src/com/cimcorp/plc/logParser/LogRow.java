@@ -90,11 +90,12 @@ public class LogRow {
         Calendar excelRef = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
         excelRef.clear();
         excelRef.setLenient(false);
-        excelRef.set(1900,01,01);
+        excelRef.set(1900,0,01);
         long excelRefDays = (excelRef.getTimeInMillis() * -1) / 1000 / 60 / 60 / 24;
 
         int i = s.indexOf("/");
         int month = Integer.parseInt(s.substring(0,i));
+        month = month - 1;
         int j = s.indexOf("/",i+1);
         int day = Integer.parseInt(s.substring(i+1,j));
         int year = Integer.parseInt(s.substring(j+1,j+5));

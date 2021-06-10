@@ -1,9 +1,8 @@
 package com.cimcorp.plc.logParser;
 
-import com.custom.ArgNotFoundException;
 import com.custom.FileNotFoundException;
 import csvUtils.CSVUtil;
-import configFileUtil.Config;
+import com.cimcorp.configFile.Config;
 
 import java.io.File;
 import java.io.IOException;
@@ -44,7 +43,7 @@ public class Main {
         return ret;
     };
 
-    public static void main(String[] args) throws FileNotFoundException, ArgNotFoundException {
+    public static void main(String[] args) throws FileNotFoundException, ArgNotFoundException, IOException {
 
         // Check for INI file ///////////////////////////////////////////////////////////////
         if (Array.getLength(args) < 3){
